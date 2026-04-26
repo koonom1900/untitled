@@ -19,7 +19,7 @@
         android:layout_height="wrap_content"
         android:text="延迟时间（秒）"
         android:textSize="16sp"
-        android:layout_bottom="8dp"/>
+        android:layout_marginBottom="8dp"/>
 
     <EditText
         android:id="@+id/etSeconds"
@@ -27,7 +27,7 @@
         android:layout_height="wrap_content"
         android:inputType="number"
         android:hint="输入秒数，如 5"
-        android:layout_bottom="24dp"/>
+        android:layout_marginBottom="24dp"/>
 
     <TextView
         android:layout_width="match_parent"
