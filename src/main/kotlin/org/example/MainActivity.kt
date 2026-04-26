@@ -1,9 +1,8 @@
 package org.example
 
-import android.app.AlarmManager
-import android.app.PendingIntent
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -13,6 +12,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,6 +30,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        createNotificationChannel()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
@@ -62,47 +67,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun scheduleNotification(seconds: Long, message: String) {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(this, NotificationReceiver::class.java).apply {
-            putExtra(NotificationReceiver.EXTRA_MESSAGE, message)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            this,
-            System.currentTimeMillis().toInt(),
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val triggerAtMillis = System.currentTimeMillis() + seconds * 1000
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAtMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAtMillis,
-                    pendingIntent
-                )
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                NotificationWorker.CHANNEL_ID,
+                "定时提醒",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "用于显示定时提醒通知"
             }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                triggerAtMillis,
-                pendingIntent
-            )
-        } else {
-            alarmManager.setExact(
-                AlarmManager.RTC_WAKEUP,
-                triggerAtMillis,
-                pendingIntent
-            )
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
         }
+    }
+
+    private fun scheduleNotification(seconds: Long, message: String) {
+        val workData = Data.Builder()
+            .putString(NotificationWorker.KEY_MESSAGE, message)
+            .build()
+
+        val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
+            .setInitialDelay(seconds, TimeUnit.SECONDS)
+            .setInputData(workData)
+            .build()
+
+        WorkManager.getInstance(this).enqueue(workRequest)
     }
 }
