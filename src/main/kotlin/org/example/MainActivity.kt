@@ -35,15 +35,15 @@ class MainActivity : AppCompatActivity() {
             requestNotificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        val etMinutes = findViewById<EditText>(R.id.etMinutes)
+        val etSeconds = findViewById<EditText>(R.id.etSeconds)
         val etMessage = findViewById<EditText>(R.id.etMessage)
         val btnSchedule = findViewById<Button>(R.id.btnSchedule)
 
         btnSchedule.setOnClickListener {
-            val minutesText = etMinutes.text.toString().trim()
+            val secondsText = etSeconds.text.toString().trim()
             val message = etMessage.text.toString().trim()
 
-            if (minutesText.isEmpty()) {
+            if (secondsText.isEmpty()) {
                 Toast.makeText(this, "请输入延迟时间", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -51,18 +51,18 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "请输入提醒内容", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val minutes = minutesText.toLongOrNull()
-            if (minutes == null || minutes <= 0) {
-                Toast.makeText(this, "请输入有效的分钟数（大于0）", Toast.LENGTH_SHORT).show()
+            val seconds = secondsText.toLongOrNull()
+            if (seconds == null || seconds <= 0) {
+                Toast.makeText(this, "请输入有效的秒数（大于0）", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            scheduleNotification(minutes, message)
-            Toast.makeText(this, "${minutes} 分钟后将发送提醒", Toast.LENGTH_SHORT).show()
+            scheduleNotification(seconds, message)
+            Toast.makeText(this, "${seconds} 秒后将发送提醒", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun scheduleNotification(minutes: Long, message: String) {
+    private fun scheduleNotification(seconds: Long, message: String) {
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(this, NotificationReceiver::class.java).apply {
             putExtra(NotificationReceiver.EXTRA_MESSAGE, message)
@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val triggerAtMillis = System.currentTimeMillis() + minutes * 60 * 1000
+        val triggerAtMillis = System.currentTimeMillis() + seconds * 1000
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (alarmManager.canScheduleExactAlarms()) {
