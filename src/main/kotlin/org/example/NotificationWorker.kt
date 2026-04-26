@@ -14,6 +14,7 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Worker(co
 
     override fun doWork(): Result {
         val message = inputData.getString(KEY_MESSAGE) ?: return Result.failure()
+        val title = inputData.getString(KEY_TITLE) ?: "提醒"
         Log.d("NotificationWorker", "开始执行后台通知任务: $message")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -32,7 +33,7 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Worker(co
 
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(applicationContext.applicationInfo.icon)
-            .setContentTitle("提醒")
+            .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -54,5 +55,6 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Worker(co
     companion object {
         const val CHANNEL_ID = "reminder_channel"
         const val KEY_MESSAGE = "message"
+        const val KEY_TITLE = "title"
     }
 }
