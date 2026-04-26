@@ -3,6 +3,7 @@ package org.example
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -12,10 +13,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
@@ -82,15 +79,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun scheduleNotification(seconds: Long, message: String) {
-        val workData = Data.Builder()
-            .putString(NotificationWorker.KEY_MESSAGE, message)
-            .build()
-
-        val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
-            .setInitialDelay(seconds, TimeUnit.SECONDS)
-            .setInputData(workData)
-            .build()
-
-        WorkManager.getInstance(this).enqueue(workRequest)
+        val intent = Intent(this, ForegroundReminderService::class.java).apply {
+            putExtra("seconds", seconds)
+            putExtra("message", message)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
     }
 }
