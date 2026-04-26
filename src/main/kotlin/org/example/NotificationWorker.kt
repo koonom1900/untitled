@@ -1,5 +1,6 @@
 package org.example
 
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -15,6 +16,7 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Worker(co
     override fun doWork(): Result {
         val message = inputData.getString(KEY_MESSAGE) ?: return Result.failure()
         val title = inputData.getString(KEY_TITLE) ?: "提醒"
+        ensureChannelExists()
         Log.d("NotificationWorker", "开始执行后台通知任务: $message")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -50,6 +52,18 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Worker(co
         }
 
         return Result.success()
+    }
+
+    private fun ensureChannelExists() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+                val channel = NotificationChannel(CHANNEL_ID, "定时提醒", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "用于显示定时提醒通知"
+                }
+                manager.createNotificationChannel(channel)
+            }
+        }
     }
 
     companion object {
