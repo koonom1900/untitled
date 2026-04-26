@@ -1,9 +1,5 @@
 package org.example
 
-import android.app.AlarmManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -13,6 +9,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
@@ -63,22 +63,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun scheduleNotification(minutes: Long, message: String) {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(this, NotificationReceiver::class.java).apply {
-            putExtra(NotificationReceiver.EXTRA_MESSAGE, message)
-        }
-        val requestCode = System.currentTimeMillis().toInt()
-        val pendingIntent = PendingIntent.getBroadcast(
-            this, requestCode, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val workRequest = OneTimeWorkRequestBuilder<NotificationWorker>()
+            .setInitialDelay(minutes, TimeUnit.MINUTES)
+            .setInputData(workDataOf(NotificationWorker.KEY_MESSAGE to message))
+            .build()
 
-        val triggerAtMillis = System.currentTimeMillis() + minutes * 60_000L
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-        }
+        WorkManager.getInstance(this).enqueue(workRequest)
     }
 }
