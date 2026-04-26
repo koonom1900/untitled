@@ -3,6 +3,7 @@ package org.example
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -32,6 +33,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         createNotificationChannel()
+        startForegroundService()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
@@ -65,6 +67,11 @@ class MainActivity : AppCompatActivity() {
             scheduleNotification(seconds, message)
             Toast.makeText(this, "${seconds} 秒后将发送提醒", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun startForegroundService() {
+        val serviceIntent = Intent(this, ForegroundReminderService::class.java)
+        ContextCompat.startForegroundService(this, serviceIntent)
     }
 
     private fun createNotificationChannel() {
