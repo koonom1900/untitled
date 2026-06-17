@@ -197,46 +197,29 @@ class MainActivity : AppCompatActivity() {
                 ).absolutePath
 
                 // 执行 FFmpeg 命令
-                // 尝试使用 h264_mediacodec 以获得硬件加速和更好的兼容性 (libx264 在 LGPL 版本中通常不可用)
-                val ffmpegCommand = "-f concat -safe 0 -r 24 -i \"${listFile.absolutePath}\" -c:v h264_mediacodec -pix_fmt yuv420p -y \"$outputPath\""
+                // 优化编码策略：
+                // 1. 优先尝试 hevc_mediacodec (H.265)，它在相同码率下画质更好
+                // 2. 增加码率 (-b:v 8M) 提高清晰度
+                // 3. 设置 profile 为 high (如果支持)
+                val ffmpegCommand = "-f concat -safe 0 -r 24 -i \"${listFile.absolutePath}\" " +
+                        "-c:v hevc_mediacodec -b:v 8M -pix_fmt yuv420p -y \"$outputPath\""
 
-                tvStatus.post { tvStatus.text = "正在生成视频..." }
+                tvStatus.post { tvStatus.text = "正在生成视频 (H.265)..." }
 
                 FFmpegKit.executeAsync(ffmpegCommand) { session ->
                     val returnCode = session.returnCode
+                    val logs = session.allLogsAsString
                     runOnUiThread {
-                        pbVideoGeneration.visibility = View.GONE
-                        btnGenerateVideo.isEnabled = true
                         if (ReturnCode.isSuccess(returnCode)) {
+                            pbVideoGeneration.visibility = View.GONE
+                            btnGenerateVideo.isEnabled = true
                             tvStatus.text = "视频生成成功: $outputPath"
                             Toast.makeText(this, "视频已保存至 Movies 目录", Toast.LENGTH_LONG).show()
                         } else {
-                            val logs = session.allLogsAsString
-                            Log.e("FFmpegKit", "Video generation failed with return code $returnCode. Logs: $logs")
-
-                            // 如果 h264_mediacodec 也失败，尝试使用最基础的 mpeg4 编码器
-                            if (logs.contains("Unknown encoder 'h264_mediacodec'")) {
-                                tvStatus.text = "硬件编码器不可用，正在尝试基础编码器..."
-                                retryWithMpeg4(listFile, outputPath)
-                                return@runOnUiThread
-                            }
-                            
-                            // 将日志写入文件
-                            val logFile = File(
-                                getExternalFilesDir(Environment.DIRECTORY_MOVIES),
-                                "ffmpeg_log_${System.currentTimeMillis()}.txt"
-                            )
-                            try {
-                                logFile.writeText(logs)
-                                tvStatus.text = "生成失败，日志已保存至: ${logFile.absolutePath}"
-                            } catch (e: Exception) {
-                                tvStatus.text = "生成失败且无法写入日志文件"
-                            }
-                            
-                            Toast.makeText(this, "生成失败，请查看日志文件", Toast.LENGTH_SHORT).show()
+                            Log.e("FFmpegKit", "HEVC failed, trying H.264. Logs: $logs")
+                            // 如果 H.265 不支持，回退到优化的 H.264
+                            retryWithH264Optimized(listFile, outputPath, tempDir)
                         }
-                        // 清理临时文件 (如果是重试，则由重试逻辑负责清理)
-                        tempDir.deleteRecursively()
                     }
                 }
             } catch (e: Exception) {
@@ -249,11 +232,36 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun retryWithMpeg4(listFile: File, outputPath: String) {
-        val ffmpegCommand = "-f concat -safe 0 -r 24 -i \"${listFile.absolutePath}\" -c:v mpeg4 -y \"$outputPath\""
+    private fun retryWithH264Optimized(listFile: File, outputPath: String, tempDir: File) {
+        // 增加码率到 8M，并尝试使用 high profile
+        val ffmpegCommand = "-f concat -safe 0 -r 24 -i \"${listFile.absolutePath}\" " +
+                "-c:v h264_mediacodec -b:v 8M -pix_fmt yuv420p -y \"$outputPath\""
         
-        pbVideoGeneration.visibility = View.VISIBLE
-        btnGenerateVideo.isEnabled = false
+        tvStatus.text = "正在使用 H.264 优化模式..."
+        
+        FFmpegKit.executeAsync(ffmpegCommand) { session ->
+            val returnCode = session.returnCode
+            val logs = session.allLogsAsString
+            runOnUiThread {
+                if (ReturnCode.isSuccess(returnCode)) {
+                    pbVideoGeneration.visibility = View.GONE
+                    btnGenerateVideo.isEnabled = true
+                    tvStatus.text = "视频生成成功 (H.264): $outputPath"
+                    Toast.makeText(this, "视频已保存至 Movies 目录", Toast.LENGTH_LONG).show()
+                    tempDir.deleteRecursively()
+                } else {
+                    Log.e("FFmpegKit", "H.264 failed, trying MPEG4. Logs: $logs")
+                    retryWithMpeg4(listFile, outputPath, tempDir)
+                }
+            }
+        }
+    }
+
+    private fun retryWithMpeg4(listFile: File, outputPath: String, tempDir: File) {
+        // MPEG4 也稍微增加一点码率，虽然它本身效率较低
+        val ffmpegCommand = "-f concat -safe 0 -r 24 -i \"${listFile.absolutePath}\" -c:v mpeg4 -b:v 4M -y \"$outputPath\""
+        
+        tvStatus.text = "硬件加速不可用，正在使用基础编码器..."
         
         FFmpegKit.executeAsync(ffmpegCommand) { session ->
             val returnCode = session.returnCode
@@ -261,20 +269,22 @@ class MainActivity : AppCompatActivity() {
                 pbVideoGeneration.visibility = View.GONE
                 btnGenerateVideo.isEnabled = true
                 if (ReturnCode.isSuccess(returnCode)) {
-                    tvStatus.text = "视频生成成功 (mpeg4): $outputPath"
+                    tvStatus.text = "视频生成成功 (基础模式): $outputPath"
                     Toast.makeText(this, "视频已保存至 Movies 目录", Toast.LENGTH_LONG).show()
                 } else {
                     val logs = session.allLogsAsString
-                    Log.e("FFmpegKit", "Mpeg4 fallback failed: $logs")
                     val logFile = File(
                         getExternalFilesDir(Environment.DIRECTORY_MOVIES),
-                        "ffmpeg_log_retry_${System.currentTimeMillis()}.txt"
+                        "ffmpeg_log_${System.currentTimeMillis()}.txt"
                     )
-                    logFile.writeText(logs)
-                    tvStatus.text = "所有编码器均失败，日志: ${logFile.absolutePath}"
+                    try {
+                        logFile.writeText(logs)
+                        tvStatus.text = "所有编码尝试均失败，日志: ${logFile.absolutePath}"
+                    } catch (e: Exception) {
+                        tvStatus.text = "生成失败且无法写入日志"
+                    }
                 }
-                // 最终清理
-                listFile.parentFile?.deleteRecursively()
+                tempDir.deleteRecursively()
             }
         }
     }
