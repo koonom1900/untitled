@@ -156,7 +156,7 @@ class MainActivity : AppCompatActivity() {
         
         val files = folder.listFiles()
             .filter { it.isFile && (it.name?.endsWith(".jpg", true) == true || it.name?.endsWith(".jpeg", true) == true) }
-            .sortedByDescending { it.name }
+            .sortedBy { it.name }
 
         if (files.isEmpty()) {
             Toast.makeText(this, "文件夹内没有找到图片", Toast.LENGTH_SHORT).show()
