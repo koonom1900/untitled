@@ -1,10 +1,10 @@
-name: Android CI
+name: Android CI (New Feature Branch)
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "new-feature" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "new-feature" ]
 
 jobs:
   build:
@@ -29,5 +29,5 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v5
       with:
-        name: app-debug
+        name: app-debug-new-feature
         path: build/outputs/apk/debug/*.apk
