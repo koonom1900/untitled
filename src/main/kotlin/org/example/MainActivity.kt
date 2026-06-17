@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.DocumentsContract
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -210,8 +211,10 @@ class MainActivity : AppCompatActivity() {
                             tvStatus.text = "视频生成成功: $outputPath"
                             Toast.makeText(this, "视频已保存至 Movies 目录", Toast.LENGTH_LONG).show()
                         } else {
-                            tvStatus.text = "视频生成失败"
-                            Toast.makeText(this, "生成失败，请查看日志", Toast.LENGTH_SHORT).show()
+                            val logs = session.allLogsAsString
+                            Log.e("FFmpegKit", "Video generation failed with return code $returnCode. Logs: $logs")
+                            tvStatus.text = "视频生成失败，请在 Logcat 中搜索 'FFmpegKit' 查看详情"
+                            Toast.makeText(this, "生成失败，详情请看日志", Toast.LENGTH_SHORT).show()
                         }
                         // 清理临时文件
                         tempDir.deleteRecursively()
