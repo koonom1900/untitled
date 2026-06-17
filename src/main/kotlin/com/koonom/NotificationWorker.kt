@@ -1,4 +1,4 @@
-package org.example
+package com.koonom
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
