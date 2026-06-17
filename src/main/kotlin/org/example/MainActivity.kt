@@ -213,8 +213,20 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             val logs = session.allLogsAsString
                             Log.e("FFmpegKit", "Video generation failed with return code $returnCode. Logs: $logs")
-                            tvStatus.text = "视频生成失败，请在 Logcat 中搜索 'FFmpegKit' 查看详情"
-                            Toast.makeText(this, "生成失败，详情请看日志", Toast.LENGTH_SHORT).show()
+                            
+                            // 将日志写入文件
+                            val logFile = File(
+                                getExternalFilesDir(Environment.DIRECTORY_MOVIES),
+                                "ffmpeg_log_${System.currentTimeMillis()}.txt"
+                            )
+                            try {
+                                logFile.writeText(logs)
+                                tvStatus.text = "生成失败，日志已保存至: ${logFile.absolutePath}"
+                            } catch (e: Exception) {
+                                tvStatus.text = "生成失败且无法写入日志文件"
+                            }
+                            
+                            Toast.makeText(this, "生成失败，请查看日志文件", Toast.LENGTH_SHORT).show()
                         }
                         // 清理临时文件
                         tempDir.deleteRecursively()
