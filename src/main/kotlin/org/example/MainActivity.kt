@@ -197,8 +197,8 @@ class MainActivity : AppCompatActivity() {
                 ).absolutePath
 
                 // 执行 FFmpeg 命令
-                // ffmpeg -f concat -safe 0 -i input.txt -c:v libx264 -pix_fmt yuv420p output.mp4
-                val ffmpegCommand = "-f concat -safe 0 -r 24 -i \"${listFile.absolutePath}\" -c:v libx264 -pix_fmt yuv420p -y \"$outputPath\""
+                // 尝试使用 h264_mediacodec 以获得硬件加速和更好的兼容性 (libx264 在 LGPL 版本中通常不可用)
+                val ffmpegCommand = "-f concat -safe 0 -r 24 -i \"${listFile.absolutePath}\" -c:v h264_mediacodec -pix_fmt yuv420p -y \"$outputPath\""
 
                 tvStatus.post { tvStatus.text = "正在生成视频..." }
 
@@ -213,6 +213,13 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             val logs = session.allLogsAsString
                             Log.e("FFmpegKit", "Video generation failed with return code $returnCode. Logs: $logs")
+
+                            // 如果 h264_mediacodec 也失败，尝试使用最基础的 mpeg4 编码器
+                            if (logs.contains("Unknown encoder 'h264_mediacodec'")) {
+                                tvStatus.text = "硬件编码器不可用，正在尝试基础编码器..."
+                                retryWithMpeg4(listFile, outputPath)
+                                return@runOnUiThread
+                            }
                             
                             // 将日志写入文件
                             val logFile = File(
@@ -228,7 +235,7 @@ class MainActivity : AppCompatActivity() {
                             
                             Toast.makeText(this, "生成失败，请查看日志文件", Toast.LENGTH_SHORT).show()
                         }
-                        // 清理临时文件
+                        // 清理临时文件 (如果是重试，则由重试逻辑负责清理)
                         tempDir.deleteRecursively()
                     }
                 }
@@ -240,6 +247,36 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }.start()
+    }
+
+    private fun retryWithMpeg4(listFile: File, outputPath: String) {
+        val ffmpegCommand = "-f concat -safe 0 -r 24 -i \"${listFile.absolutePath}\" -c:v mpeg4 -y \"$outputPath\""
+        
+        pbVideoGeneration.visibility = View.VISIBLE
+        btnGenerateVideo.isEnabled = false
+        
+        FFmpegKit.executeAsync(ffmpegCommand) { session ->
+            val returnCode = session.returnCode
+            runOnUiThread {
+                pbVideoGeneration.visibility = View.GONE
+                btnGenerateVideo.isEnabled = true
+                if (ReturnCode.isSuccess(returnCode)) {
+                    tvStatus.text = "视频生成成功 (mpeg4): $outputPath"
+                    Toast.makeText(this, "视频已保存至 Movies 目录", Toast.LENGTH_LONG).show()
+                } else {
+                    val logs = session.allLogsAsString
+                    Log.e("FFmpegKit", "Mpeg4 fallback failed: $logs")
+                    val logFile = File(
+                        getExternalFilesDir(Environment.DIRECTORY_MOVIES),
+                        "ffmpeg_log_retry_${System.currentTimeMillis()}.txt"
+                    )
+                    logFile.writeText(logs)
+                    tvStatus.text = "所有编码器均失败，日志: ${logFile.absolutePath}"
+                }
+                // 最终清理
+                listFile.parentFile?.deleteRecursively()
+            }
+        }
     }
 
     private fun startForegroundService() {
