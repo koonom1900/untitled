@@ -3,19 +3,19 @@ plugins {
     id("org.jetbrains.kotlin.android") version "1.9.22"
 }
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
+group = "com.koonom"
+version = "0.0.2-SNAPSHOT"
 
 android {
-    namespace = "org.example"
+    namespace = "com.koonom"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "org.example"
+        applicationId = "com.koonom"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
