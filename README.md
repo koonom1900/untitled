@@ -1,1 +1,1 @@
-a simple program for time lapse vedio
+a simple andriod app for time lapse vedio
